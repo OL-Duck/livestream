@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>直播時間軸小幫手</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2em 15%;
+      line-height: 1.6;
+    }
+    label {
+      display: block;
+      margin-top: 1em;
+    }
+    .time-row {
+      display: flex;
+      gap: 0.5em;
+      align-items: center;
+      margin-bottom: 0.5em;
+    }
+    .time-row input {
+      font-size: 16px;
+    }
+    .clock {
+      font-weight: bold;
+      font-size: 1.2em;
+      margin-bottom: 1em;
+    }
+    button {
+      margin-top: 1em;
+    }
+    textarea.readonly-output {
+      background: #f2f2f2;
+      padding: 0.5em;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      width: calc(100% - 1em);
+      resize: none;
+      height: auto;
+      box-sizing: border-box;
+    }
+    .song-row {
+      display: flex;
+      gap: 0.5em;
+      margin-bottom: 0.5em;
+    }
+    .song-row input {
+      flex: 1;
+      font-size: 16px;
+      white-space: normal;
+      word-wrap: break-word;
+    }
+    .intro, .time-block, .result-block, .adjust-block {
+      margin-bottom: 2em;
+      background-color: #f9f9f9;
+      padding: 1.5em;
+      border-radius: 8px;
+    }
+    .intro h2 {
+      margin-top: 0;
+    }
+    .intro-columns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2em;
+    }
+    .intro-column {
+      flex: 1;
+      min-width: 250px;
+    }
+    .ps-note {
+      font-size: 0.9em;
+      font-style: italic;
+      color: #666;
+    }
+    #adjustArea {
+      font-size: 16px;
+      width: 100%;
+      resize: none;
+      overflow: hidden;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 0.5em;
+      box-sizing: border-box;
+    }
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #111;
+        color: #eee;
+      }
+      .intro, .time-block, .result-block, .adjust-block, textarea.readonly-output {
+        background-color: #222;
+        color: #ddd;
+        border: 1px solid #444;
+      }
+      input, textarea {
+        background-color: #333;
+        color: #fff;
+        border: 1px solid #555;
+      }
+      button {
+        background-color: #444;
+        color: #fff;
+      }
+      .ps-note {
+        color: #aaa;
+      }
+      .modal {
+        background: #fff;
+        color: #555;
+      }
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #555;
+      color: #fff;
+      padding: 1em;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      max-width: 300px;
+      z-index: 1000;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1em;
+    }
+    .overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+  <div class="intro">
+    <h1>🎙️ 直播時間軸小幫手</h1>
+    <p>這是一個用來快速標記 YouTube 直播歌曲時間戳的小工具。<br>
+    填入直播開始時間、結束時間、直播時長、歌曲清單，即可一鍵產生章節時間軸！<br>
+    <span class="ps-note">p.s. 也可以用來標記精華（shorts）時間點喔！</span>
+    </p>
+
+    <div class="intro-columns">
+      <div class="intro-column">
+        <h2>✨ 功能特色</h2>
+        <ol>
+          <li>即時顯示本地時間</li>
+          <li>一鍵填入當下時間</li>
+          <li>歌名 + 時間分開輸入，支援動態新增或刪除欄位</li>
+          <li>自動跨日計算（如 23:00 → 01:00）</li>
+          <li>輸出時間戳格式，可直接用於影片章節標記，並提供「校正區」手動調整</li>
+        </ol>
+      </div>
+      <div class="intro-column">
+        <h2>📖 使用方式教學</h2>
+        <ol>
+          <li>輸入「開台時間」，或使用「結束時間 + 時長」自動推算開始時間</li>
+          <li>為每首歌填入「歌名」與「絕對時間」，可用「現在時間」按鈕快速填寫</li>
+          <li>如需刪除歌單列，點選「刪除」按鈕，會出現刪除提示視窗</li>
+          <li>按下「產生直播時間軸」後，結果會顯示於下方</li>
+          <li>可於「校正區」直接複製貼上結果並手動修正時間</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="clock" id="clock"></div>
+
+  <div class="time-block">
+    <div class="time-row">
+      <label>開台時間 (Start Time):
+        <input type="text" id="startTime" placeholder="HH:MM:SS">
+        <button onclick="fillNow('startTime')">現在時間</button>
+      </label>
+    </div>
+
+    <div class="time-row">
+      <label>關台時間 (End Time):
+        <input type="text" id="endTime" placeholder="HH:MM:SS">
+        <button onclick="fillNow('endTime')">現在時間</button>
+      </label>
+    </div>
+
+    <div class="time-row">
+      <label>直播時長 (Duration):
+        <input type="text" id="duration" placeholder="HH:MM:SS">
+      </label>
+    </div>
+
+    <label>歌曲清單（歌名 + 時間）</label>
+    <div id="songList"></div>
+    <button onclick="addSongRow()">🈳 新增歌曲欄位</button>
+
+    <button onclick="generateTimeline()">✅ 產生直播時間軸</button>
+  </div>
+
+  <div class="result-block">
+    <h3>📋 結果</h3>
+    <textarea class="readonly-output" id="output" readonly></textarea>
+  </div>
+
+  <div class="adjust-block">
+    <h3>✏️ 校正區</h3>
+    <textarea id="adjustArea" placeholder="在這裡貼上並校正時間軸..." style="height:150px;"></textarea>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+  <div class="modal" id="confirmModal">
+    <p>刪除此欄位會清除其中內容，確定要刪除嗎？</p>
+    <label><input type="checkbox" id="noRemind"> 不再提醒</label>
+    <div class="modal-footer">
+      <div></div>
+      <button onclick="confirmDelete()">確認</button>
+    </div>
+  </div>
+
+  <script>
+    sessionStorage.removeItem('noRemind');
+    let pendingDeleteRow = null;
+
+    function showModal(row) {
+      const inputs = row.querySelectorAll('input');
+      const hasContent = Array.from(inputs).some(input => input.value.trim() !== '');
+      const noRemind = sessionStorage.getItem('noRemind') === 'true';
+
+      if (noRemind || !hasContent) {
+        row.remove();
+        return;
+      }
+      pendingDeleteRow = row;
+      document.getElementById('overlay').style.display = 'block';
+      document.getElementById('confirmModal').style.display = 'block';
+    }
+
+    function confirmDelete() {
+      if (document.getElementById('noRemind').checked) {
+        sessionStorage.setItem('noRemind', 'true');
+      }
+      if (pendingDeleteRow) {
+        pendingDeleteRow.remove();
+        pendingDeleteRow = null;
+      }
+      document.getElementById('overlay').style.display = 'none';
+      document.getElementById('confirmModal').style.display = 'none';
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById("clock").textContent = `⏰ 現在時間：${h}:${m}:${s}`;
+      const delay = 1000 - now.getMilliseconds();
+      setTimeout(updateClock, delay);
+    }
+    updateClock();
+
+    function fillNow(fieldId) {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById(fieldId).value = `${h}:${m}:${s}`;
+    }
+
+    function fillNowForSong(button) {
+      const timeInput = button.previousElementSibling;
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      timeInput.value = `${h}:${m}:${s}`;
+    }
+
+    function autoResizeTextarea(el) {
+      el.style.height = 'auto';
+      el.style.height = (el.scrollHeight) + 'px';
+    }
+
+    document.getElementById('adjustArea').addEventListener('input', function() {
+      autoResizeTextarea(this);
+    });
+
+    function normalizeTimeStr(t) {
+      const parts = t.trim().split(":").map(Number);
+      while (parts.length < 3) parts.push(0);
+      return parts;
+    }
+
+    function toSeconds(t) {
+      const [h, m, s] = normalizeTimeStr(t);
+      return h * 3600 + m * 60 + s;
+    }
+
+    function formatSeconds(sec) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      return `${h > 0 ? String(h).padStart(2, '0') + ':' : ''}${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function addSongRow() {
+      const container = document.getElementById("songList");
+      const row = document.createElement("div");
+      row.className = "song-row";
+      row.innerHTML = `
+        <button onclick="showModal(this.parentElement)">刪除</button>
+        <input type="text" placeholder="歌名">
+        <input type="text" placeholder="時間 (HH:MM:SS)">
+        <button onclick="fillNowForSong(this)">現在時間</button>
+      `;
+      container.appendChild(row);
+    }
+
+    for (let i = 0; i < 5; i++) addSongRow();
+
+    function generateTimeline() {
+      let startTime = document.getElementById("startTime").value.trim();
+      const endTime = document.getElementById("endTime").value.trim();
+      const duration = document.getElementById("duration").value.trim();
+
+      if (!startTime && endTime && duration) {
+        let endSec = toSeconds(endTime);
+        let durSec = toSeconds(duration);
+        let startSec = endSec - durSec;
+        if (startSec < 0) startSec += 86400;
+        startTime = formatSeconds(startSec);
+      }
+
+      if (!startTime) {
+        alert("請輸入開台時間或提供結束時間與時長。");
+        return;
+      }
+
+      const startSec = toSeconds(startTime);
+      let result = [];
+
+      const rows = document.querySelectorAll(".song-row");
+      for (const row of rows) {
+        const inputs = row.querySelectorAll("input");
+        const name = inputs[0].value.trim();
+        const absTime = inputs[1].value.trim();
+        if (!name || !absTime) continue;
+        let songSec = toSeconds(absTime);
+        let diff = songSec - startSec;
+        if (diff < 0) diff += 86400; // 跨日處理
+        result.push({ time: diff, text: `${formatSeconds(diff)} ${name}` });
+      }
+
+      result.sort((a, b) => a.time - b.time);
+      document.getElementById("output").value = result.map(r => r.text).join("\n");
+    }
+  </script>
+</body>
+</html>
