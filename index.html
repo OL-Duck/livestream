@@ -215,15 +215,21 @@
       z-index: 999;
     }
 
-    .clear-btn-container {
-      text-align: center;
-      margin-top: 1em;
+    #clearFixedContainer {
+      position: fixed;
+      bottom: 1em;
+      right: 1em;
+      z-index: 9999;
     }
 
-    .clear-btn-container button {
-      padding: 0.5em 1.2em;
-      font-size: 16px;
+    #clearFixedContainer button {
+      background-color: #e53935;
+      color: white;
+      padding: 0.5em 1em;
+      border: none;
+      border-radius: 6px;
       cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
   </style>
 </head>
@@ -311,7 +317,7 @@
     <textarea id="adjustArea" placeholder="在這裡貼上並校正時間軸..." style="height:150px;"></textarea>
   </div>
 
-  <div class="clear-btn-container">
+  <div id="clearFixedContainer">
     <button onclick="clearAllData()">🚮 手動清空</button>
   </div>
 
