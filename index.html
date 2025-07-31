@@ -380,13 +380,23 @@
     }
 
     function fillNowForSong(button) {
-      const timeInput = button.previousElementSibling;
+      // 往上找到最近一層的 .song-row（整列）
+      const row = button.closest('.song-row');
+    
+      // 在該列中找 placeholder 是「時間 (HH:MM:SS)」的輸入框
+      const timeInput = row.querySelector('input[placeholder="時間 (HH:MM:SS)"]');
+    
+      // 取得現在時間並格式化成 HH:MM:SS
       const now = new Date();
       const h = String(now.getHours()).padStart(2, '0');
       const m = String(now.getMinutes()).padStart(2, '0');
       const s = String(now.getSeconds()).padStart(2, '0');
-      timeInput.value = `${h}:${m}:${s}`;
-      saveAllData();
+    
+      // 若成功找到該欄位，填入時間並儲存
+      if (timeInput) {
+        timeInput.value = `${h}:${m}:${s}`;
+        saveAllData(); // 同步儲存
+      }
     }
 
     function autoResizeTextarea(el) {
